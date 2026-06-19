@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 
 from pyspark.sql import SparkSession
@@ -18,8 +19,28 @@ from pyspark.sql.types import (
     StringType,
 )
 
-# Permet à Databricks de trouver le package Python dans le repo
-sys.path.append("src")
+def find_src_path(start_path: Path) -> Path:
+    """
+    Recherche le dossier src du repo, peu importe le répertoire
+    depuis lequel Databricks exécute le script.
+    """
+    for parent in [start_path, *start_path.parents]:
+        candidate = parent / "src" / "pcvie_controls"
+        if candidate.exists():
+            return parent / "src"
+
+    raise RuntimeError(
+        f"Impossible de trouver src/pcvie_controls depuis {start_path}"
+    )
+
+
+current_file = Path(__file__).resolve()
+src_path = find_src_path(current_file)
+
+print(f"Current file: {current_file}")
+print(f"Detected src path: {src_path}")
+
+sys.path.insert(0, str(src_path))
 
 from pcvie_controls.scoring import control_customer
 
