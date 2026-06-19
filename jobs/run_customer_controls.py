@@ -1,4 +1,5 @@
 import sys
+import inspect
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -19,12 +20,31 @@ from pyspark.sql.types import (
     StringType,
 )
 
+def get_current_file_path() -> Path:
+    """
+    Compatible Databricks Job / Git source.
+    Dans certains contextes Databricks, __file__ n'est pas défini.
+    On récupère alors le filename utilisé par compile(...).
+    """
+    if "__file__" in globals():
+        return Path(__file__).resolve()
+
+    frame = inspect.currentframe()
+    if frame is not None:
+        return Path(frame.f_code.co_filename).resolve()
+
+    raise RuntimeError("Impossible de déterminer le chemin du script courant.")
+
+
 def find_src_path(start_path: Path) -> Path:
     """
-    Recherche le dossier src du repo, peu importe le répertoire
-    depuis lequel Databricks exécute le script.
+    Recherche le dossier src du repo.
+    Structure attendue :
+      repo/
+        jobs/run_customer_controls.py
+        src/pcvie_controls/
     """
-    for parent in [start_path, *start_path.parents]:
+    for parent in [start_path.parent, *start_path.parents]:
         candidate = parent / "src" / "pcvie_controls"
         if candidate.exists():
             return parent / "src"
@@ -34,11 +54,11 @@ def find_src_path(start_path: Path) -> Path:
     )
 
 
-current_file = Path(__file__).resolve()
+current_file = get_current_file_path()
 src_path = find_src_path(current_file)
 
-print(f"Current file: {current_file}")
-print(f"Detected src path: {src_path}")
+print(f"Current file detected: {current_file}")
+print(f"Source path detected: {src_path}")
 
 sys.path.insert(0, str(src_path))
 
